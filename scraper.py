@@ -4,13 +4,19 @@ import time
 from datetime import datetime
 import sqlite3
 import re
+import json
+
+# Load configuration from config.json
+with open("config.json", "r") as config_file:
+    config = json.load(config_file)
 
 # Connect to the SQLite database
-conn = sqlite3.connect('scraped_data.db')
+conn = sqlite3.connect("scraped_data.db")
 cursor = conn.cursor()
 
 # Create a table if it doesn't exist
-cursor.execute('''
+cursor.execute(
+    """
     CREATE TABLE IF NOT EXISTS items (
         id INTEGER PRIMARY KEY,
         uad_id INTEGER,
@@ -19,20 +25,23 @@ cursor.execute('''
         price INTEGER,
         timestamp DATE
     )
-''')
+"""
+)
 conn.commit()
 
+
 def convert_price(price_str):
-    numeric_part = re.sub('\D', '', price_str)  # Remove non-numeric characters
+    numeric_part = re.sub(r"\D", "", price_str)  # Remove non-numeric characters
     if numeric_part:
         return int(numeric_part)
     return 0
 
-def scrape_and_notify():
-    base_url = "https://hardverapro.hu/aprok/keres.php?stext=raspberry+pi&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&buying=0&stext_none=&search_title=1&noiced=1"
+
+def scrape_and_notify(search_term):
+    base_url = f"https://hardverapro.hu/aprok/keres.php?stext={search_term}&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&buying=0&stext_none=&search_title=1&noiced=1"
 
     response = requests.get(base_url)
-    soup = BeautifulSoup(response.content, 'html.parser')
+    soup = BeautifulSoup(response.content, "html.parser")
 
     for i, item2 in enumerate(soup.find_all("li", class_="media")):
         uad_id = item2.get("data-uadid")
@@ -40,23 +49,33 @@ def scrape_and_notify():
         url = item2.find("div", class_="uad-title").h1.a["href"]
         title = item2.find("div", class_="uad-title").h1.a.string
         timestamp = datetime.now()
-        
+
         numeric_price = convert_price(price)
 
-        cursor.execute('SELECT * FROM items WHERE uad_id = ?', (uad_id,))
+        cursor.execute("SELECT * FROM items WHERE uad_id = ?", (uad_id,))
         existing_item = cursor.fetchone()
 
         if not existing_item:
-            cursor.execute('INSERT INTO items (uad_id, url, title, price, timestamp) VALUES (?, ?, ?, ?, ?)', (uad_id, url, title, numeric_price, timestamp))
+            cursor.execute(
+                "INSERT INTO items (uad_id, url, title, price, timestamp) VALUES (?, ?, ?, ?, ?)",
+                (uad_id, url, title, numeric_price, timestamp),
+            )
             conn.commit()
 
-            print(f"New Item Found - ID: {uad_id}, Price: {numeric_price}, URL: {url}, Title: {title}")
+            print(
+                f"New Item Found - ID: {uad_id}, Price: {numeric_price}, URL: {url}, Title: {title}"
+            )
 
-# Run the scraping and notification process every 30 minutes
+
+# Get configuration options
+search_term = config["search_term"]
+interval_minutes = config["interval_minutes"]
+
+# Run the scraping and notification process with the specified interval
 while True:
-    scrape_and_notify()
-    print("Waiting for 30 minutes...")
-    time.sleep(1800)  # 30 minutes in seconds
+    scrape_and_notify(search_term)
+    print(f"Waiting for {interval_minutes} minutes...")
+    time.sleep(interval_minutes * 60)  # Convert minutes to seconds
 
 # Close the database connection when done
 conn.close()
