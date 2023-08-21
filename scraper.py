@@ -5,12 +5,20 @@ from datetime import datetime
 import sqlite3
 import re
 import json
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 # Load configuration from config.json
 with open("config.json", "r") as config_file:
     config = json.load(config_file)
 
 # Connect to the SQLite database
+logging.info("connecting to database...")
 conn = sqlite3.connect("scraped_data.db")
 cursor = conn.cursor()
 
@@ -31,7 +39,7 @@ conn.commit()
 
 
 def convert_price(price_str):
-    numeric_part = re.sub(r"\D", "", price_str)  # Remove non-numeric characters
+    numeric_part = re.sub("\D", "", price_str)  # Remove non-numeric characters
     if numeric_part:
         return int(numeric_part)
     return 0
@@ -62,9 +70,8 @@ def scrape_and_notify(search_term):
             )
             conn.commit()
 
-            print(
-                f"New Item Found - ID: {uad_id}, Price: {numeric_price}, URL: {url}, Title: {title}"
-            )
+            log_message = f"New Item Found - ID: {uad_id}, Price: {numeric_price}, URL: {url}, Title: {title}"
+            logging.info(log_message)
 
 
 # Get configuration options
@@ -72,9 +79,11 @@ search_term = config["search_term"]
 interval_minutes = config["interval_minutes"]
 
 # Run the scraping and notification process with the specified interval
+logging.info("start scraping...")
 while True:
     scrape_and_notify(search_term)
-    print(f"Waiting for {interval_minutes} minutes...")
+    log_message = f"Waiting for {interval_minutes} minutes..."
+    logging.info(log_message)
     time.sleep(interval_minutes * 60)  # Convert minutes to seconds
 
 # Close the database connection when done
