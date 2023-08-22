@@ -51,11 +51,11 @@ def scrape_and_notify(search_term):
     response = requests.get(base_url)
     soup = BeautifulSoup(response.content, "html.parser")
 
-    for i, item2 in enumerate(soup.find_all("li", class_="media")):
-        uad_id = item2.get("data-uadid")
-        price = item2.find("div", class_="uad-price").string
-        url = item2.find("div", class_="uad-title").h1.a["href"]
-        title = item2.find("div", class_="uad-title").h1.a.string
+    for i, item in enumerate(soup.find_all("li", class_="media")):
+        uad_id = item.get("data-uadid")
+        price = item.find("div", class_="uad-price").string
+        url = item.find("div", class_="uad-title").h1.a["href"]
+        title = item.find("div", class_="uad-title").h1.a.string
         timestamp = datetime.now()
 
         numeric_price = convert_price(price)
