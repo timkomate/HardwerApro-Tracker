@@ -31,7 +31,8 @@ cursor.execute(
         url TEXT NOT NULL UNIQUE,
         title TEXT,
         price INTEGER,
-        timestamp DATE
+        timestamp DATE,
+        is_alive BOOLEAN
     )
 """
 )
@@ -50,14 +51,14 @@ def scrape_and_notify(search_term):
 
     response = requests.get(base_url)
     soup = BeautifulSoup(response.content, "html.parser")
-
+    ids = set()
     for i, item in enumerate(soup.find_all("li", class_="media")):
         uad_id = item.get("data-uadid")
+        ids.add(int(uad_id))
         price = item.find("div", class_="uad-price").string
         url = item.find("div", class_="uad-title").h1.a["href"]
         title = item.find("div", class_="uad-title").h1.a.string
         timestamp = datetime.now()
-
         numeric_price = convert_price(price)
 
         cursor.execute("SELECT * FROM items WHERE uad_id = ?", (uad_id,))
@@ -65,13 +66,20 @@ def scrape_and_notify(search_term):
 
         if not existing_item:
             cursor.execute(
-                "INSERT INTO items (uad_id, url, title, price, timestamp) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO items (uad_id, url, title, price, timestamp, is_alive) VALUES (?, ?, ?, ?, ?, True)",
                 (uad_id, url, title, numeric_price, timestamp),
             )
             conn.commit()
 
             log_message = f"New Item Found - ID: {uad_id}, Price: {numeric_price}, URL: {url}, Title: {title}"
             logging.info(log_message)
+    cursor.execute("SELECT uad_id FROM items WHERE is_alive = True")
+    existing_item = cursor.fetchall()
+    existing_item = set(item[0] for item in existing_item)
+    diff = existing_item.difference(ids)
+    for id in diff:
+        cursor.execute('UPDATE items SET is_alive = ? WHERE uad_id = ?', (False, id))
+        conn.commit()
 
 
 # Get configuration options
